@@ -1,0 +1,998 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 108,
+   "id": "63f8cb0a",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Requirement already satisfied: pycrf in c:\\users\\shruti manjrekar\\anaconda3\\lib\\site-packages (0.0.1)\n",
+      "Requirement already satisfied: sklearn-crfsuite in c:\\users\\shruti manjrekar\\anaconda3\\lib\\site-packages (0.3.6)\n",
+      "Requirement already satisfied: python-crfsuite>=0.8.3 in c:\\users\\shruti manjrekar\\anaconda3\\lib\\site-packages (from sklearn-crfsuite) (0.9.8)\n",
+      "Requirement already satisfied: tqdm>=2.0 in c:\\users\\shruti manjrekar\\anaconda3\\lib\\site-packages (from sklearn-crfsuite) (4.64.0)\n",
+      "Requirement already satisfied: six in c:\\users\\shruti manjrekar\\anaconda3\\lib\\site-packages (from sklearn-crfsuite) (1.16.0)\n",
+      "Requirement already satisfied: tabulate in c:\\users\\shruti manjrekar\\anaconda3\\lib\\site-packages (from sklearn-crfsuite) (0.8.9)\n",
+      "Requirement already satisfied: colorama in c:\\users\\shruti manjrekar\\anaconda3\\lib\\site-packages (from tqdm>=2.0->sklearn-crfsuite) (0.4.4)\n"
+     ]
+    }
+   ],
+   "source": [
+    "!pip install pycrf\n",
+    "!pip install sklearn-crfsuite\n",
+    "\n",
+    "import spacy\n",
+    "import sklearn_crfsuite\n",
+    "from sklearn_crfsuite import metrics\n",
+    "\n",
+    "model = spacy.load(\"en_core_web_sm\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 109,
+   "id": "8931ea2f",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def word2sentence(filename):\n",
+    "  input_file = open(filename, 'r')\n",
+    "  file_content = input_file.readlines() \n",
+    "  input_file.close()\n",
+    "\n",
+    "  #To store list of sequences (sentences or labels)\n",
+    "  out_lines = [] \n",
+    "\n",
+    "  line_content = \"\"\n",
+    "\n",
+    "  for word in file_content:\n",
+    "    word = word.strip() \n",
+    "    # If empty line, add the current sequence to out_lines\n",
+    "    if word == \"\": \n",
+    "      out_lines.append(line_content)\n",
+    "      line_content = \"\"; # re-initialize, new line starts\n",
+    "    else:\n",
+    "      if line_content: #if non-empty, add new word after space, part of current sentence\n",
+    "        line_content += \" \"+word\n",
+    "      else:\n",
+    "        line_content = word # first word, no space required\n",
+    "\n",
+    "  return out_lines"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 110,
+   "id": "c8d1cf7c",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#prepare datasets\n",
+    "train_sentences = word2sentence('train_sent')\n",
+    "train_labels = word2sentence('train_label')\n",
+    "test_sentences = word2sentence('test_sent')\n",
+    "test_labels = word2sentence('test_label')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 111,
+   "id": "c96d9905",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "sentence: All live births > or = 23 weeks at the University of Vermont in 1995 ( n = 2395 ) were retrospectively analyzed for delivery route , indication for cesarean , gestational age , parity , and practice group ( to reflect risk status )\n",
+      "lablel: O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O \n",
+      "\n",
+      "\n",
+      "sentence: The total cesarean rate was 14.4 % ( 344 of 2395 ) , and the primary rate was 11.4 % ( 244 of 2144 )\n",
+      "lablel: O O O O O O O O O O O O O O O O O O O O O O O O O \n",
+      "\n",
+      "\n",
+      "sentence: Abnormal presentation was the most common indication ( 25.6 % , 88 of 344 )\n",
+      "lablel: O O O O O O O O O O O O O O O \n",
+      "\n",
+      "\n",
+      "sentence: The `` corrected '' cesarean rate ( maternal-fetal medicine and transported patients excluded ) was 12.4 % ( 273 of 2194 ) , and the `` corrected '' primary rate was 9.6 % ( 190 of 1975 )\n",
+      "lablel: O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O \n",
+      "\n",
+      "\n",
+      "sentence: Arrest of dilation was the most common indication in both `` corrected '' subgroups ( 23.4 and 24.6 % , respectively )\n",
+      "lablel: O O O O O O O O O O O O O O O O O O O O O O \n",
+      "\n",
+      "\n",
+      "sentence: Cesarean rates at tertiary care hospitals should be compared with rates at community hospitals only after correcting for dissimilar patient groups or gestational age\n",
+      "lablel: O O O O O O O O O O O O O O O O O O O O O O O O \n",
+      "\n",
+      "\n",
+      "sentence: In the third trimester , the amniotic fluid index ( AFI ) may be affected by maternal fluid status\n",
+      "lablel: O O O O O O O O O O O O O O O O O O O \n",
+      "\n",
+      "\n",
+      "sentence: We hypothesize that as temperature increases there would be a concomitant decrease in AFI\n",
+      "lablel: O O O O O O O O O O O O O O \n",
+      "\n",
+      "\n",
+      "sentence: From June 11 to August 16 , 1993 , during a period of unusual high heat , 42 women with singleton pregnancies between 27 and 40 weeks ' gestation undergoing serial antenatal testing had AFI determinations recorded at least weekly\n",
+      "lablel: O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O O \n",
+      "\n",
+      "\n",
+      "sentence: The daily high ambient temperature in our urban area was subsequently obtained\n",
+      "lablel: O O O O O O O O O O O O \n",
+      "\n",
+      "\n",
+      "sentence: A 2- , 3- , and 4-day mean temperature prior to the test date was compared to AFI using a Spearman-rank Correlation\n",
+      "lablel: O O O O O O O O O O O O O O O O O O O O O O \n",
+      "\n",
+      "\n",
+      "sentence: This relationship should be taken into account when interpreting the AFI as a measure of fetal well-being\n",
+      "lablel: O O O O O O O O O O O O O O O O O \n",
+      "\n",
+      "\n",
+      "sentence: The study population included 84 women with gestational diabetes , ascertained by universal screening of all women attending the antenatal clinic of the Hadassah Medical Center , over a 2-year period\n",
+      "lablel: O O O O O O O D D O O O O O O O O O O O O O O O O O O O O O O \n",
+      "\n",
+      "\n",
+      "sentence: The 60 women ( 71 % ) , who initiated treatment before 34 completed weeks , composed the `` early '' group\n",
+      "lablel: O O O O O O O O O O O O O O O O O O O O O O \n",
+      "\n",
+      "\n",
+      "sentence: The 24 women ( 29 % ) , who initiated treatment after the 34th week , composed the `` late '' group\n",
+      "lablel: O O O O O O O O O O O O O O O O O O O O O O \n",
+      "\n",
+      "\n",
+      "sentence: All patients were managed by an intensified protocol , including stringent glycemic control\n",
+      "lablel: O O O O O O O O O O O T T \n",
+      "\n",
+      "\n",
+      "sentence: Maternal characteristics were similar in the two groups\n",
+      "lablel: O O O O O O O O \n",
+      "\n",
+      "\n",
+      "sentence: No significant differences were found between the two groups in the mode of delivery or Apgar scores\n",
+      "lablel: O O O O O O O O O O O O O O O O O \n",
+      "\n",
+      "\n",
+      "sentence: We conclude that to reduce the rate of macrosomic infants in gestational diabetes cases , good glycemic control should be initiated before 34 completed gestational weeks\n",
+      "lablel: O O O O O O O O D D D D D D O T T T O O O O O O O O \n",
+      "\n",
+      "\n",
+      "sentence: Our aim was to investigate the contribution of certain antenatally detectable markers leading to the diagnosis of trisomic fetuses we observed over a period of 6 years\n",
+      "lablel: O O O O O O O O O O O O O O O O O O O O O O O O O O O \n",
+      "\n",
+      "\n",
+      "sentence: Down syndrome ( 12 cases ) and Edward syndrome ( 11 cases ) were the most common trisomies , while 4 cases of Patau syndrome were also diagnosed\n",
+      "lablel: D D O O O O O D D O O O O O O O O D O O O O O D D O O O \n",
+      "\n",
+      "\n",
+      "sentence: Down syndrome fetuses ( 41.7 % ) had prenatally detected sonographic anomalies , 63.6 % for Edward syndrome , and all fetuses with Patau syndrome ( 4 of 4 ) showed abnormal sonographic signs\n",
+      "lablel: D D O O O O O O O O O O O O O O D D O O O O O D D O O O O O O O O O \n",
+      "\n",
+      "\n",
+      "sentence: Trisomy 21 presented with the following features : hydramnios , complex malformations , pyelectasis , and duodenal atresia\n",
+      "lablel: D D O O O O O O O O O O O D O O D D \n",
+      "\n",
+      "\n",
+      "sentence: Signs observed in fetuses with trisomy 13 were : hydrocephalus , intrauterine growth retardation , oligoanhydramnios , complex malformations , severe fetal bradycardia and hydronephrosis\n",
+      "lablel: O O O O O D D O O O O O O O O O O O O O O O D O D \n",
+      "\n",
+      "\n",
+      "sentence: Fifty-three triplet pregnancies between 1986 and 1993 at The New York Hospital-Cornell Medical Center were reviewed\n",
+      "lablel: O O O O O O O O O O O O O O O O \n",
+      "\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Print the 5 sentences from the word2sentence dataset\n",
+    "\n",
+    "for i in range(25):\n",
+    "    print(\"sentence:\",train_sentences[i])\n",
+    "    print(\"lablel:\",train_labels[i],\"\\n\\n\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "9f1e0387",
+   "metadata": {},
+   "source": [
+    "# Count of the number of sentences in the processed train and test dataset"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 112,
+   "id": "fcae931a",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "No. of lines in train_sentences: 2599\n",
+      "No. of lines in test_sentences: 1056\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(\"No. of lines in train_sentences:\", len(train_sentences))\n",
+    "print(\"No. of lines in test_sentences:\", len(test_sentences))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "182c4498",
+   "metadata": {},
+   "source": [
+    "# Count the number of lines of labels in the processed train and test dataset."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 113,
+   "id": "5ab62d93",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "No. of lines in train_labels: 2599\n",
+      "No. of lines in test_labels: 1056\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(\"No. of lines in train_labels:\", len(train_labels))\n",
+    "print(\"No. of lines in test_labels:\", len(test_labels))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "f422b8ea",
+   "metadata": {},
+   "source": [
+    "We will first explore what are the various concepts present in the dataset. For this, we will use PoS Tagging."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "891bf48b",
+   "metadata": {},
+   "source": [
+    "# Extract those tokens which have NOUN or PROPN as their PoS tag and find their frequency"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 114,
+   "id": "c2a9385b",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "noun_propn = {}\n",
+    "for sentences in (train_sentences, test_sentences):\n",
+    "  for sentence in sentences:\n",
+    "    processed_sentence = model(sentence) # Process each sentence by spacy model\n",
+    "    for token in processed_sentence:\n",
+    "      if(token.pos_ == 'NOUN' or token.pos_ == 'PROPN'): #check if the token is a noun\n",
+    "        noun_propn[token.text] = noun_propn.get(token.text, 0) + 1; #increase its frequency if it is noun"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "a1d98103",
+   "metadata": {},
+   "source": [
+    "# Print the top 25 most common tokens with NOUN or PROPN PoS tags"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 115,
+   "id": "afd8ec58",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "[('patients', 492),\n",
+       " ('treatment', 281),\n",
+       " ('%', 247),\n",
+       " ('cancer', 200),\n",
+       " ('therapy', 175),\n",
+       " ('study', 154),\n",
+       " ('disease', 142),\n",
+       " ('cell', 140),\n",
+       " ('lung', 116),\n",
+       " ('group', 94),\n",
+       " ('chemotherapy', 88),\n",
+       " ('gene', 87),\n",
+       " ('effects', 85),\n",
+       " ('women', 77),\n",
+       " ('results', 77),\n",
+       " ('use', 75),\n",
+       " ('risk', 71),\n",
+       " ('cases', 71),\n",
+       " ('surgery', 71),\n",
+       " ('analysis', 70),\n",
+       " ('rate', 67),\n",
+       " ('dose', 66),\n",
+       " ('response', 66),\n",
+       " ('survival', 65),\n",
+       " ('children', 64)]"
+      ]
+     },
+     "execution_count": 115,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "from collections import Counter\n",
+    "concept_counter = Counter(noun_propn)\n",
+    "concept_counter.most_common(25)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "a1c9bf1c",
+   "metadata": {},
+   "source": [
+    "# Defining features for CRF"
+   ]
+  },
+  {
+   "cell_type": "raw",
+   "id": "a809e452",
+   "metadata": {},
+   "source": [
+    "Defining features for CRF\n",
+    "Following feature functions are used to compute the features of each word after converting the word to lower case\n",
+    "\n",
+    "f1 : the word itself\n",
+    "f2 : POS_tag of the word\n",
+    "f3 : last three characters of the word\n",
+    "f4 : last two characters of the word\n",
+    "f5 : length of the word\n",
+    "f6 : the previous word\n",
+    "f7 : POS_tag of the previous word\n",
+    "f8 : length of the previous word\n",
+    "f9 : if word is at the beginning of the sentence, add BEG\n",
+    "f10 :if word is at the end of the sentence, add END"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 116,
+   "id": "c3fc09fe",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Let's define the features to get the feature value for one word.\n",
+    "# Let's define the features to get the feature value for one word.\n",
+    "\n",
+    "def getFeaturesForOneWord(sentence, pos, pos_tags):\n",
+    "  word = sentence[pos]\n",
+    "\n",
+    "  #Define 12 features with PoS tag as one of the features\n",
+    "  features = [\n",
+    "    'word.lower=' + word.lower(), # serves as word id\n",
+    "    'word[-3:]=' + word[-3:],     # last three characters\n",
+    "    'word[0:]=' + word[0:],     # first character\n",
+    "    'word[-1:]=' + word[-1:],     # last character\n",
+    "    'word[-2:]=' + word[-2:],     # last two characters\n",
+    "    'word.isupper=%s' % word.isupper(),  # is the word in all uppercase\n",
+    "    'word.isdigit=%s' % word.isdigit(),  # is the word a number\n",
+    "    'word.startsWithCapital=%s' % word[0].isupper(), # is the word starting with a capital letter\n",
+    "    'word.pos=' + pos_tags[pos]\n",
+    "  ]\n",
+    "\n",
+    "  #Use the previous word also while defining features\n",
+    "  if(pos > 0):\n",
+    "    prev_word = sentence[pos-1]\n",
+    "    features.extend([\n",
+    "    'prev_word.lower=' + prev_word.lower(), \n",
+    "    'prev_word[-1:]=' + prev_word[-1:],     # last character\n",
+    "    'prev_word[-2:]=' + prev_word[-2:],     # last two characters\n",
+    "    'prev_word.isupper=%s' % prev_word.isupper(),\n",
+    "    'prev_word.isdigit=%s' % prev_word.isdigit(),\n",
+    "    'prev_word.startsWithCapital=%s' % prev_word[0].isupper(),\n",
+    "    'prev_word.pos=' + pos_tags[pos-1]\n",
+    "   \n",
+    "  ])\n",
+    "  # Mark the begining and the end words of a sentence correctly in the form of features.\n",
+    "  else:\n",
+    "    features.append('BEG') # feature to track begin of sentence \n",
+    "\n",
+    "  if(pos == len(sentence)-1):\n",
+    "    features.append('END') # feature to track end of sentence\n",
+    "  return features\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "4bf312aa",
+   "metadata": {},
+   "source": [
+    "# Getting the features words and sentences"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "13e9d6ac",
+   "metadata": {},
+   "source": [
+    "Define a function to get features for a sentence using the already defined 'getFeaturesForOneWord' function"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "b70c325c",
+   "metadata": {},
+   "source": [
+    "Function that extracts the features of a sentence"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 118,
+   "id": "bba83552",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Define a function to get features for a sentence using the 'getFeaturesForOneWord' function.\n",
+    "\n",
+    "def getFeaturesForOneSentence(sentence):\n",
+    "  pos_processed_sentence = model(sentence)#spacy is applied to sentence\n",
+    "  pos_tags = []#correctly identify pos tags\n",
+    "  for token in pos_processed_sentence:\n",
+    "    pos_tags.append(token.pos_)\n",
+    "\n",
+    "  sentence_list = sentence.split()# List of words in sentence\n",
+    "  \n",
+    "  \n",
+    "  return [getFeaturesForOneWord(sentence_list, pos, pos_tags) for pos in range(len(sentence_list))]"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "c8e98b2b",
+   "metadata": {},
+   "source": [
+    "Function that extracts the labels of a sentence"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 119,
+   "id": "1854af9a",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Define a function to get the labels for a sentence.\n",
+    "def getLabelsInListForOneSentence(labels):\n",
+    "  return labels.split()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "864c58a5",
+   "metadata": {},
+   "source": [
+    "# Defining the input and target variables for the CRF model"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 120,
+   "id": "8cde379b",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "X_train = [getFeaturesForOneSentence(sentence) for sentence in train_sentences]\n",
+    "X_test = [getFeaturesForOneSentence(sentence) for sentence in test_sentences]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 121,
+   "id": "51a8284e",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[['word.lower=all', 'word[-3:]=All', 'word[0:]=All', 'word[-1:]=l', 'word[-2:]=ll', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=True', 'word.pos=DET', 'BEG'], ['word.lower=live', 'word[-3:]=ive', 'word[0:]=live', 'word[-1:]=e', 'word[-2:]=ve', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=ADJ', 'prev_word.lower=all', 'prev_word[-1:]=l', 'prev_word[-2:]=ll', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=True', 'prev_word.pos=DET'], ['word.lower=births', 'word[-3:]=ths', 'word[0:]=births', 'word[-1:]=s', 'word[-2:]=hs', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=NOUN', 'prev_word.lower=live', 'prev_word[-1:]=e', 'prev_word[-2:]=ve', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=ADJ'], ['word.lower=>', 'word[-3:]=>', 'word[0:]=>', 'word[-1:]=>', 'word[-2:]=>', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=X', 'prev_word.lower=births', 'prev_word[-1:]=s', 'prev_word[-2:]=hs', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=NOUN'], ['word.lower=or', 'word[-3:]=or', 'word[0:]=or', 'word[-1:]=r', 'word[-2:]=or', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=CCONJ', 'prev_word.lower=>', 'prev_word[-1:]=>', 'prev_word[-2:]=>', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=X'], ['word.lower==', 'word[-3:]==', 'word[0:]==', 'word[-1:]==', 'word[-2:]==', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=SYM', 'prev_word.lower=or', 'prev_word[-1:]=r', 'prev_word[-2:]=or', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=CCONJ'], ['word.lower=23', 'word[-3:]=23', 'word[0:]=23', 'word[-1:]=3', 'word[-2:]=23', 'word.isupper=False', 'word.isdigit=True', 'word.startsWithCapital=False', 'word.pos=NUM', 'prev_word.lower==', 'prev_word[-1:]==', 'prev_word[-2:]==', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=SYM'], ['word.lower=weeks', 'word[-3:]=eks', 'word[0:]=weeks', 'word[-1:]=s', 'word[-2:]=ks', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=NOUN', 'prev_word.lower=23', 'prev_word[-1:]=3', 'prev_word[-2:]=23', 'prev_word.isupper=False', 'prev_word.isdigit=True', 'prev_word.startsWithCapital=False', 'prev_word.pos=NUM'], ['word.lower=at', 'word[-3:]=at', 'word[0:]=at', 'word[-1:]=t', 'word[-2:]=at', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=ADP', 'prev_word.lower=weeks', 'prev_word[-1:]=s', 'prev_word[-2:]=ks', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=NOUN'], ['word.lower=the', 'word[-3:]=the', 'word[0:]=the', 'word[-1:]=e', 'word[-2:]=he', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=DET', 'prev_word.lower=at', 'prev_word[-1:]=t', 'prev_word[-2:]=at', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=ADP'], ['word.lower=university', 'word[-3:]=ity', 'word[0:]=University', 'word[-1:]=y', 'word[-2:]=ty', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=True', 'word.pos=PROPN', 'prev_word.lower=the', 'prev_word[-1:]=e', 'prev_word[-2:]=he', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=DET'], ['word.lower=of', 'word[-3:]=of', 'word[0:]=of', 'word[-1:]=f', 'word[-2:]=of', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=ADP', 'prev_word.lower=university', 'prev_word[-1:]=y', 'prev_word[-2:]=ty', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=True', 'prev_word.pos=PROPN'], ['word.lower=vermont', 'word[-3:]=ont', 'word[0:]=Vermont', 'word[-1:]=t', 'word[-2:]=nt', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=True', 'word.pos=PROPN', 'prev_word.lower=of', 'prev_word[-1:]=f', 'prev_word[-2:]=of', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=ADP'], ['word.lower=in', 'word[-3:]=in', 'word[0:]=in', 'word[-1:]=n', 'word[-2:]=in', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=ADP', 'prev_word.lower=vermont', 'prev_word[-1:]=t', 'prev_word[-2:]=nt', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=True', 'prev_word.pos=PROPN'], ['word.lower=1995', 'word[-3:]=995', 'word[0:]=1995', 'word[-1:]=5', 'word[-2:]=95', 'word.isupper=False', 'word.isdigit=True', 'word.startsWithCapital=False', 'word.pos=NUM', 'prev_word.lower=in', 'prev_word[-1:]=n', 'prev_word[-2:]=in', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=ADP'], ['word.lower=(', 'word[-3:]=(', 'word[0:]=(', 'word[-1:]=(', 'word[-2:]=(', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=PUNCT', 'prev_word.lower=1995', 'prev_word[-1:]=5', 'prev_word[-2:]=95', 'prev_word.isupper=False', 'prev_word.isdigit=True', 'prev_word.startsWithCapital=False', 'prev_word.pos=NUM'], ['word.lower=n', 'word[-3:]=n', 'word[0:]=n', 'word[-1:]=n', 'word[-2:]=n', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=ADP', 'prev_word.lower=(', 'prev_word[-1:]=(', 'prev_word[-2:]=(', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=PUNCT'], ['word.lower==', 'word[-3:]==', 'word[0:]==', 'word[-1:]==', 'word[-2:]==', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=X', 'prev_word.lower=n', 'prev_word[-1:]=n', 'prev_word[-2:]=n', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=ADP'], ['word.lower=2395', 'word[-3:]=395', 'word[0:]=2395', 'word[-1:]=5', 'word[-2:]=95', 'word.isupper=False', 'word.isdigit=True', 'word.startsWithCapital=False', 'word.pos=NUM', 'prev_word.lower==', 'prev_word[-1:]==', 'prev_word[-2:]==', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=X'], ['word.lower=)', 'word[-3:]=)', 'word[0:]=)', 'word[-1:]=)', 'word[-2:]=)', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=PUNCT', 'prev_word.lower=2395', 'prev_word[-1:]=5', 'prev_word[-2:]=95', 'prev_word.isupper=False', 'prev_word.isdigit=True', 'prev_word.startsWithCapital=False', 'prev_word.pos=NUM'], ['word.lower=were', 'word[-3:]=ere', 'word[0:]=were', 'word[-1:]=e', 'word[-2:]=re', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=AUX', 'prev_word.lower=)', 'prev_word[-1:]=)', 'prev_word[-2:]=)', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=PUNCT'], ['word.lower=retrospectively', 'word[-3:]=ely', 'word[0:]=retrospectively', 'word[-1:]=y', 'word[-2:]=ly', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=ADV', 'prev_word.lower=were', 'prev_word[-1:]=e', 'prev_word[-2:]=re', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=AUX'], ['word.lower=analyzed', 'word[-3:]=zed', 'word[0:]=analyzed', 'word[-1:]=d', 'word[-2:]=ed', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=VERB', 'prev_word.lower=retrospectively', 'prev_word[-1:]=y', 'prev_word[-2:]=ly', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=ADV'], ['word.lower=for', 'word[-3:]=for', 'word[0:]=for', 'word[-1:]=r', 'word[-2:]=or', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=ADP', 'prev_word.lower=analyzed', 'prev_word[-1:]=d', 'prev_word[-2:]=ed', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=VERB'], ['word.lower=delivery', 'word[-3:]=ery', 'word[0:]=delivery', 'word[-1:]=y', 'word[-2:]=ry', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=NOUN', 'prev_word.lower=for', 'prev_word[-1:]=r', 'prev_word[-2:]=or', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=ADP'], ['word.lower=route', 'word[-3:]=ute', 'word[0:]=route', 'word[-1:]=e', 'word[-2:]=te', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=NOUN', 'prev_word.lower=delivery', 'prev_word[-1:]=y', 'prev_word[-2:]=ry', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=NOUN'], ['word.lower=,', 'word[-3:]=,', 'word[0:]=,', 'word[-1:]=,', 'word[-2:]=,', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=PUNCT', 'prev_word.lower=route', 'prev_word[-1:]=e', 'prev_word[-2:]=te', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=NOUN'], ['word.lower=indication', 'word[-3:]=ion', 'word[0:]=indication', 'word[-1:]=n', 'word[-2:]=on', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=NOUN', 'prev_word.lower=,', 'prev_word[-1:]=,', 'prev_word[-2:]=,', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=PUNCT'], ['word.lower=for', 'word[-3:]=for', 'word[0:]=for', 'word[-1:]=r', 'word[-2:]=or', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=ADP', 'prev_word.lower=indication', 'prev_word[-1:]=n', 'prev_word[-2:]=on', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=NOUN'], ['word.lower=cesarean', 'word[-3:]=ean', 'word[0:]=cesarean', 'word[-1:]=n', 'word[-2:]=an', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=PROPN', 'prev_word.lower=for', 'prev_word[-1:]=r', 'prev_word[-2:]=or', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=ADP'], ['word.lower=,', 'word[-3:]=,', 'word[0:]=,', 'word[-1:]=,', 'word[-2:]=,', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=PUNCT', 'prev_word.lower=cesarean', 'prev_word[-1:]=n', 'prev_word[-2:]=an', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=PROPN'], ['word.lower=gestational', 'word[-3:]=nal', 'word[0:]=gestational', 'word[-1:]=l', 'word[-2:]=al', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=ADJ', 'prev_word.lower=,', 'prev_word[-1:]=,', 'prev_word[-2:]=,', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=PUNCT'], ['word.lower=age', 'word[-3:]=age', 'word[0:]=age', 'word[-1:]=e', 'word[-2:]=ge', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=NOUN', 'prev_word.lower=gestational', 'prev_word[-1:]=l', 'prev_word[-2:]=al', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=ADJ'], ['word.lower=,', 'word[-3:]=,', 'word[0:]=,', 'word[-1:]=,', 'word[-2:]=,', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=PUNCT', 'prev_word.lower=age', 'prev_word[-1:]=e', 'prev_word[-2:]=ge', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=NOUN'], ['word.lower=parity', 'word[-3:]=ity', 'word[0:]=parity', 'word[-1:]=y', 'word[-2:]=ty', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=NOUN', 'prev_word.lower=,', 'prev_word[-1:]=,', 'prev_word[-2:]=,', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=PUNCT'], ['word.lower=,', 'word[-3:]=,', 'word[0:]=,', 'word[-1:]=,', 'word[-2:]=,', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=PUNCT', 'prev_word.lower=parity', 'prev_word[-1:]=y', 'prev_word[-2:]=ty', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=NOUN'], ['word.lower=and', 'word[-3:]=and', 'word[0:]=and', 'word[-1:]=d', 'word[-2:]=nd', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=CCONJ', 'prev_word.lower=,', 'prev_word[-1:]=,', 'prev_word[-2:]=,', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=PUNCT'], ['word.lower=practice', 'word[-3:]=ice', 'word[0:]=practice', 'word[-1:]=e', 'word[-2:]=ce', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=NOUN', 'prev_word.lower=and', 'prev_word[-1:]=d', 'prev_word[-2:]=nd', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=CCONJ'], ['word.lower=group', 'word[-3:]=oup', 'word[0:]=group', 'word[-1:]=p', 'word[-2:]=up', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=NOUN', 'prev_word.lower=practice', 'prev_word[-1:]=e', 'prev_word[-2:]=ce', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=NOUN'], ['word.lower=(', 'word[-3:]=(', 'word[0:]=(', 'word[-1:]=(', 'word[-2:]=(', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=PUNCT', 'prev_word.lower=group', 'prev_word[-1:]=p', 'prev_word[-2:]=up', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=NOUN'], ['word.lower=to', 'word[-3:]=to', 'word[0:]=to', 'word[-1:]=o', 'word[-2:]=to', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=PART', 'prev_word.lower=(', 'prev_word[-1:]=(', 'prev_word[-2:]=(', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=PUNCT'], ['word.lower=reflect', 'word[-3:]=ect', 'word[0:]=reflect', 'word[-1:]=t', 'word[-2:]=ct', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=VERB', 'prev_word.lower=to', 'prev_word[-1:]=o', 'prev_word[-2:]=to', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=PART'], ['word.lower=risk', 'word[-3:]=isk', 'word[0:]=risk', 'word[-1:]=k', 'word[-2:]=sk', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=NOUN', 'prev_word.lower=reflect', 'prev_word[-1:]=t', 'prev_word[-2:]=ct', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=VERB'], ['word.lower=status', 'word[-3:]=tus', 'word[0:]=status', 'word[-1:]=s', 'word[-2:]=us', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=NOUN', 'prev_word.lower=risk', 'prev_word[-1:]=k', 'prev_word[-2:]=sk', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=NOUN'], ['word.lower=)', 'word[-3:]=)', 'word[0:]=)', 'word[-1:]=)', 'word[-2:]=)', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=PUNCT', 'prev_word.lower=status', 'prev_word[-1:]=s', 'prev_word[-2:]=us', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=NOUN', 'END']]\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(X_train[0])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 122,
+   "id": "f4f9a2c9",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[['word.lower=furthermore', 'word[-3:]=ore', 'word[0:]=Furthermore', 'word[-1:]=e', 'word[-2:]=re', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=True', 'word.pos=ADV', 'BEG'], ['word.lower=,', 'word[-3:]=,', 'word[0:]=,', 'word[-1:]=,', 'word[-2:]=,', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=PUNCT', 'prev_word.lower=furthermore', 'prev_word[-1:]=e', 'prev_word[-2:]=re', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=True', 'prev_word.pos=ADV'], ['word.lower=when', 'word[-3:]=hen', 'word[0:]=when', 'word[-1:]=n', 'word[-2:]=en', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=SCONJ', 'prev_word.lower=,', 'prev_word[-1:]=,', 'prev_word[-2:]=,', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=PUNCT'], ['word.lower=all', 'word[-3:]=all', 'word[0:]=all', 'word[-1:]=l', 'word[-2:]=ll', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=DET', 'prev_word.lower=when', 'prev_word[-1:]=n', 'prev_word[-2:]=en', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=SCONJ'], ['word.lower=deliveries', 'word[-3:]=ies', 'word[0:]=deliveries', 'word[-1:]=s', 'word[-2:]=es', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=NOUN', 'prev_word.lower=all', 'prev_word[-1:]=l', 'prev_word[-2:]=ll', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=DET'], ['word.lower=were', 'word[-3:]=ere', 'word[0:]=were', 'word[-1:]=e', 'word[-2:]=re', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=AUX', 'prev_word.lower=deliveries', 'prev_word[-1:]=s', 'prev_word[-2:]=es', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=NOUN'], ['word.lower=analyzed', 'word[-3:]=zed', 'word[0:]=analyzed', 'word[-1:]=d', 'word[-2:]=ed', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=VERB', 'prev_word.lower=were', 'prev_word[-1:]=e', 'prev_word[-2:]=re', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=AUX'], ['word.lower=,', 'word[-3:]=,', 'word[0:]=,', 'word[-1:]=,', 'word[-2:]=,', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=PUNCT', 'prev_word.lower=analyzed', 'prev_word[-1:]=d', 'prev_word[-2:]=ed', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=VERB'], ['word.lower=regardless', 'word[-3:]=ess', 'word[0:]=regardless', 'word[-1:]=s', 'word[-2:]=ss', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=ADV', 'prev_word.lower=,', 'prev_word[-1:]=,', 'prev_word[-2:]=,', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=PUNCT'], ['word.lower=of', 'word[-3:]=of', 'word[0:]=of', 'word[-1:]=f', 'word[-2:]=of', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=ADP', 'prev_word.lower=regardless', 'prev_word[-1:]=s', 'prev_word[-2:]=ss', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=ADV'], ['word.lower=risk', 'word[-3:]=isk', 'word[0:]=risk', 'word[-1:]=k', 'word[-2:]=sk', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=NOUN', 'prev_word.lower=of', 'prev_word[-1:]=f', 'prev_word[-2:]=of', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=ADP'], ['word.lower=status', 'word[-3:]=tus', 'word[0:]=status', 'word[-1:]=s', 'word[-2:]=us', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=NOUN', 'prev_word.lower=risk', 'prev_word[-1:]=k', 'prev_word[-2:]=sk', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=NOUN'], ['word.lower=but', 'word[-3:]=but', 'word[0:]=but', 'word[-1:]=t', 'word[-2:]=ut', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=CCONJ', 'prev_word.lower=status', 'prev_word[-1:]=s', 'prev_word[-2:]=us', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=NOUN'], ['word.lower=limited', 'word[-3:]=ted', 'word[0:]=limited', 'word[-1:]=d', 'word[-2:]=ed', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=ADJ', 'prev_word.lower=but', 'prev_word[-1:]=t', 'prev_word[-2:]=ut', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=CCONJ'], ['word.lower=to', 'word[-3:]=to', 'word[0:]=to', 'word[-1:]=o', 'word[-2:]=to', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=ADP', 'prev_word.lower=limited', 'prev_word[-1:]=d', 'prev_word[-2:]=ed', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=ADJ'], ['word.lower=gestational', 'word[-3:]=nal', 'word[0:]=gestational', 'word[-1:]=l', 'word[-2:]=al', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=ADJ', 'prev_word.lower=to', 'prev_word[-1:]=o', 'prev_word[-2:]=to', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=ADP'], ['word.lower=age', 'word[-3:]=age', 'word[0:]=age', 'word[-1:]=e', 'word[-2:]=ge', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=NOUN', 'prev_word.lower=gestational', 'prev_word[-1:]=l', 'prev_word[-2:]=al', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=ADJ'], ['word.lower=>', 'word[-3:]=>', 'word[0:]=>', 'word[-1:]=>', 'word[-2:]=>', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=X', 'prev_word.lower=age', 'prev_word[-1:]=e', 'prev_word[-2:]=ge', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=NOUN'], ['word.lower=or', 'word[-3:]=or', 'word[0:]=or', 'word[-1:]=r', 'word[-2:]=or', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=CCONJ', 'prev_word.lower=>', 'prev_word[-1:]=>', 'prev_word[-2:]=>', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=X'], ['word.lower==', 'word[-3:]==', 'word[0:]==', 'word[-1:]==', 'word[-2:]==', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=SYM', 'prev_word.lower=or', 'prev_word[-1:]=r', 'prev_word[-2:]=or', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=CCONJ'], ['word.lower=36', 'word[-3:]=36', 'word[0:]=36', 'word[-1:]=6', 'word[-2:]=36', 'word.isupper=False', 'word.isdigit=True', 'word.startsWithCapital=False', 'word.pos=NUM', 'prev_word.lower==', 'prev_word[-1:]==', 'prev_word[-2:]==', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=SYM'], ['word.lower=weeks', 'word[-3:]=eks', 'word[0:]=weeks', 'word[-1:]=s', 'word[-2:]=ks', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=NOUN', 'prev_word.lower=36', 'prev_word[-1:]=6', 'prev_word[-2:]=36', 'prev_word.isupper=False', 'prev_word.isdigit=True', 'prev_word.startsWithCapital=False', 'prev_word.pos=NUM'], ['word.lower=,', 'word[-3:]=,', 'word[0:]=,', 'word[-1:]=,', 'word[-2:]=,', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=PUNCT', 'prev_word.lower=weeks', 'prev_word[-1:]=s', 'prev_word[-2:]=ks', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=NOUN'], ['word.lower=the', 'word[-3:]=the', 'word[0:]=the', 'word[-1:]=e', 'word[-2:]=he', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=DET', 'prev_word.lower=,', 'prev_word[-1:]=,', 'prev_word[-2:]=,', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=PUNCT'], ['word.lower=rates', 'word[-3:]=tes', 'word[0:]=rates', 'word[-1:]=s', 'word[-2:]=es', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=NOUN', 'prev_word.lower=the', 'prev_word[-1:]=e', 'prev_word[-2:]=he', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=DET'], ['word.lower=did', 'word[-3:]=did', 'word[0:]=did', 'word[-1:]=d', 'word[-2:]=id', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=AUX', 'prev_word.lower=rates', 'prev_word[-1:]=s', 'prev_word[-2:]=es', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=NOUN'], ['word.lower=not', 'word[-3:]=not', 'word[0:]=not', 'word[-1:]=t', 'word[-2:]=ot', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=PART', 'prev_word.lower=did', 'prev_word[-1:]=d', 'prev_word[-2:]=id', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=AUX'], ['word.lower=change', 'word[-3:]=nge', 'word[0:]=change', 'word[-1:]=e', 'word[-2:]=ge', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=VERB', 'prev_word.lower=not', 'prev_word[-1:]=t', 'prev_word[-2:]=ot', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=PART'], ['word.lower=(', 'word[-3:]=(', 'word[0:]=(', 'word[-1:]=(', 'word[-2:]=(', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=PUNCT', 'prev_word.lower=change', 'prev_word[-1:]=e', 'prev_word[-2:]=ge', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=VERB'], ['word.lower=12.6', 'word[-3:]=2.6', 'word[0:]=12.6', 'word[-1:]=6', 'word[-2:]=.6', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=NUM', 'prev_word.lower=(', 'prev_word[-1:]=(', 'prev_word[-2:]=(', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=PUNCT'], ['word.lower=%', 'word[-3:]=%', 'word[0:]=%', 'word[-1:]=%', 'word[-2:]=%', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=NOUN', 'prev_word.lower=12.6', 'prev_word[-1:]=6', 'prev_word[-2:]=.6', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=NUM'], ['word.lower=,', 'word[-3:]=,', 'word[0:]=,', 'word[-1:]=,', 'word[-2:]=,', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=PUNCT', 'prev_word.lower=%', 'prev_word[-1:]=%', 'prev_word[-2:]=%', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=NOUN'], ['word.lower=280', 'word[-3:]=280', 'word[0:]=280', 'word[-1:]=0', 'word[-2:]=80', 'word.isupper=False', 'word.isdigit=True', 'word.startsWithCapital=False', 'word.pos=NUM', 'prev_word.lower=,', 'prev_word[-1:]=,', 'prev_word[-2:]=,', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=PUNCT'], ['word.lower=of', 'word[-3:]=of', 'word[0:]=of', 'word[-1:]=f', 'word[-2:]=of', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=ADP', 'prev_word.lower=280', 'prev_word[-1:]=0', 'prev_word[-2:]=80', 'prev_word.isupper=False', 'prev_word.isdigit=True', 'prev_word.startsWithCapital=False', 'prev_word.pos=NUM'], ['word.lower=2214', 'word[-3:]=214', 'word[0:]=2214', 'word[-1:]=4', 'word[-2:]=14', 'word.isupper=False', 'word.isdigit=True', 'word.startsWithCapital=False', 'word.pos=NUM', 'prev_word.lower=of', 'prev_word[-1:]=f', 'prev_word[-2:]=of', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=ADP'], ['word.lower=;', 'word[-3:]=;', 'word[0:]=;', 'word[-1:]=;', 'word[-2:]=;', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=PUNCT', 'prev_word.lower=2214', 'prev_word[-1:]=4', 'prev_word[-2:]=14', 'prev_word.isupper=False', 'prev_word.isdigit=True', 'prev_word.startsWithCapital=False', 'prev_word.pos=NUM'], ['word.lower=primary', 'word[-3:]=ary', 'word[0:]=primary', 'word[-1:]=y', 'word[-2:]=ry', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=ADJ', 'prev_word.lower=;', 'prev_word[-1:]=;', 'prev_word[-2:]=;', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=PUNCT'], ['word.lower=9.2', 'word[-3:]=9.2', 'word[0:]=9.2', 'word[-1:]=2', 'word[-2:]=.2', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=NUM', 'prev_word.lower=primary', 'prev_word[-1:]=y', 'prev_word[-2:]=ry', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=ADJ'], ['word.lower=%', 'word[-3:]=%', 'word[0:]=%', 'word[-1:]=%', 'word[-2:]=%', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=NOUN', 'prev_word.lower=9.2', 'prev_word[-1:]=2', 'prev_word[-2:]=.2', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=NUM'], ['word.lower=,', 'word[-3:]=,', 'word[0:]=,', 'word[-1:]=,', 'word[-2:]=,', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=PUNCT', 'prev_word.lower=%', 'prev_word[-1:]=%', 'prev_word[-2:]=%', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=NOUN'], ['word.lower=183', 'word[-3:]=183', 'word[0:]=183', 'word[-1:]=3', 'word[-2:]=83', 'word.isupper=False', 'word.isdigit=True', 'word.startsWithCapital=False', 'word.pos=NUM', 'prev_word.lower=,', 'prev_word[-1:]=,', 'prev_word[-2:]=,', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=PUNCT'], ['word.lower=of', 'word[-3:]=of', 'word[0:]=of', 'word[-1:]=f', 'word[-2:]=of', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=ADP', 'prev_word.lower=183', 'prev_word[-1:]=3', 'prev_word[-2:]=83', 'prev_word.isupper=False', 'prev_word.isdigit=True', 'prev_word.startsWithCapital=False', 'prev_word.pos=NUM'], ['word.lower=1994', 'word[-3:]=994', 'word[0:]=1994', 'word[-1:]=4', 'word[-2:]=94', 'word.isupper=False', 'word.isdigit=True', 'word.startsWithCapital=False', 'word.pos=NUM', 'prev_word.lower=of', 'prev_word[-1:]=f', 'prev_word[-2:]=of', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=ADP'], ['word.lower=)', 'word[-3:]=)', 'word[0:]=)', 'word[-1:]=)', 'word[-2:]=)', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=PUNCT', 'prev_word.lower=1994', 'prev_word[-1:]=4', 'prev_word[-2:]=94', 'prev_word.isupper=False', 'prev_word.isdigit=True', 'prev_word.startsWithCapital=False', 'prev_word.pos=NUM', 'END']]\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(X_test[0])\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "9d19d962",
+   "metadata": {},
+   "source": [
+    "# Define the labels as the target variable for test and the train dataset"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 123,
+   "id": "25fa6c51",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Define a function to get the labels for a sentence.\n",
+    "def getLabelsInListForOneSentence(labels):\n",
+    "  return labels.split()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 124,
+   "id": "f1a9dbeb",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "Y_train = [getLabelsInListForOneSentence(labels) for labels in train_labels]\n",
+    "Y_test = [getLabelsInListForOneSentence(labels) for labels in test_labels]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 125,
+   "id": "5928a4c8",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "['O', 'O', 'O', 'O', 'D', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O']\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(Y_train[27])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 126,
+   "id": "c889cd94",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[['word.lower=sequelae', 'word[-3:]=lae', 'word[0:]=Sequelae', 'word[-1:]=e', 'word[-2:]=ae', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=True', 'word.pos=PROPN', 'BEG'], ['word.lower=include', 'word[-3:]=ude', 'word[0:]=include', 'word[-1:]=e', 'word[-2:]=de', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=VERB', 'prev_word.lower=sequelae', 'prev_word[-1:]=e', 'prev_word[-2:]=ae', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=True', 'prev_word.pos=PROPN'], ['word.lower=severe', 'word[-3:]=ere', 'word[0:]=severe', 'word[-1:]=e', 'word[-2:]=re', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=ADJ', 'prev_word.lower=include', 'prev_word[-1:]=e', 'prev_word[-2:]=de', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=VERB'], ['word.lower=developmental', 'word[-3:]=tal', 'word[0:]=developmental', 'word[-1:]=l', 'word[-2:]=al', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=ADJ', 'prev_word.lower=severe', 'prev_word[-1:]=e', 'prev_word[-2:]=re', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=ADJ'], ['word.lower=delay', 'word[-3:]=lay', 'word[0:]=delay', 'word[-1:]=y', 'word[-2:]=ay', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=NOUN', 'prev_word.lower=developmental', 'prev_word[-1:]=l', 'prev_word[-2:]=al', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=ADJ'], ['word.lower=and', 'word[-3:]=and', 'word[0:]=and', 'word[-1:]=d', 'word[-2:]=nd', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=CCONJ', 'prev_word.lower=delay', 'prev_word[-1:]=y', 'prev_word[-2:]=ay', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=NOUN'], ['word.lower=asymmetric', 'word[-3:]=ric', 'word[0:]=asymmetric', 'word[-1:]=c', 'word[-2:]=ic', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=NOUN', 'prev_word.lower=and', 'prev_word[-1:]=d', 'prev_word[-2:]=nd', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=CCONJ'], ['word.lower=double', 'word[-3:]=ble', 'word[0:]=double', 'word[-1:]=e', 'word[-2:]=le', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=ADJ', 'prev_word.lower=asymmetric', 'prev_word[-1:]=c', 'prev_word[-2:]=ic', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=NOUN'], ['word.lower=hemiplegia', 'word[-3:]=gia', 'word[0:]=hemiplegia', 'word[-1:]=a', 'word[-2:]=ia', 'word.isupper=False', 'word.isdigit=False', 'word.startsWithCapital=False', 'word.pos=NOUN', 'prev_word.lower=double', 'prev_word[-1:]=e', 'prev_word[-2:]=le', 'prev_word.isupper=False', 'prev_word.isdigit=False', 'prev_word.startsWithCapital=False', 'prev_word.pos=ADJ', 'END']]\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(X_test[20])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 127,
+   "id": "c70f1751",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "['O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'D']\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(Y_test[20])"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "c691ea88",
+   "metadata": {},
+   "source": [
+    "# Build the CRF Model"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 128,
+   "id": "218308c3",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "crf = sklearn_crfsuite.CRF(max_iterations=100)\n",
+    "try:\n",
+    "    crf.fit(X_train, Y_train)\n",
+    "except AttributeError:\n",
+    "    pass\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "a737ac9d",
+   "metadata": {},
+   "source": [
+    "# Evaluation"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "67a4ce91",
+   "metadata": {},
+   "source": [
+    "The model is trained, let us now see how good it performs on the test data."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "725f4831",
+   "metadata": {},
+   "source": [
+    "Predict the 'labels' of each of the 'tokens' in each sentence of the 'Test' dataset that has been 'pre processed' earlier"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 129,
+   "id": "6fa2b9b6",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "Y_pred = crf.predict(X_test)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 130,
+   "id": "f57bd7e6",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "pred_label=[]\n",
+    "for i in Y_pred:\n",
+    "    pred_label.extend(i)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "ed1ac76f",
+   "metadata": {},
+   "source": [
+    "# Calculate the f1 score using the actual labels and the predicted labels of the test dataset."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 131,
+   "id": "b4f0b9df",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "0.9134451543339691"
+      ]
+     },
+     "execution_count": 131,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "metrics.flat_f1_score(Y_test, Y_pred, average='weighted')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "c2c3c8cb",
+   "metadata": {},
+   "source": [
+    "identifying Diseases and Treatments using Custom NER"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "bf5bb932",
+   "metadata": {},
+   "source": [
+    "# Identifying Diseases and Treatments"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "c9b3429c",
+   "metadata": {},
+   "source": [
+    "We'll now use the CRF model's prediction to prepare a record of diseases identified in the corpus and treatments used for the diseases."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 132,
+   "id": "c450e7a3",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "diseases_and_treatments =  {} # dictionary with disease as key an list of treatments as value\n",
+    "\n",
+    "for i in range(len(Y_pred)): # For each predicted sequence\n",
+    "  labels = Y_pred[i]\n",
+    "\n",
+    "  disease = \"\";\n",
+    "  treatment = \"\";\n",
+    "  \n",
+    "  for j in range(len(labels)): # for each individual label in the sequence\n",
+    "    if labels[j] == 'O': # ignore if label is O -- other\n",
+    "      continue\n",
+    "\n",
+    "    if(labels[j] == 'D'): # Label D indicates disease, so add the corresponding word from test sentence to the disease name string\n",
+    "      disease += test_sentences[i].split()[j] + \" \"\n",
+    "      continue\n",
+    "\n",
+    "    if(labels[j] == 'T'): # Label T indicates treatment, so add the corresponding word from test sentence to the treatment name string\n",
+    "      treatment += test_sentences[i].split()[j] + \" \"\n",
+    "\n",
+    "  disease = disease.strip() # to remove extraneous spaces\n",
+    "  treatment = treatment.strip()\n",
+    "\n",
+    "  # add the identified disease and treatment to the dictionary\n",
+    "  # if it is a new disease, directly add the value\n",
+    "  # if the disease has been seen previously, get the treatment list\n",
+    "  # and add current treatment to the list.\n",
+    "    \n",
+    "  if disease != \"\" and treatment != \"\":\n",
+    "    if disease not in diseases_and_treatments.keys():\n",
+    "      diseases_and_treatments[disease] = [treatment]\n",
+    "    else:\n",
+    "      treatment_list = diseases_and_treatments.get(disease)\n",
+    "      treatment_list.append(treatment)\n",
+    "      diseases_and_treatments[disease] = treatment_list "
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "a3f07713",
+   "metadata": {},
+   "source": [
+    "# Predict the treatment for the disease name: 'hereditary retinoblastoma'"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 133,
+   "id": "cd0a7b25",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "{'gestational diabetes': ['good glycemic control'],\n",
+       " 'hereditary retinoblastoma': ['radiotherapy'],\n",
+       " 'myocardial infarction': ['aspirin , or 1 mg warfarin aspirin'],\n",
+       " 'unstable angina or non-Q-wave myocardial infarction': ['roxithromycin'],\n",
+       " 'coronary-artery disease': ['Antichlamydial antibiotics'],\n",
+       " 'primary pulmonary hypertension ( PPH )': ['fenfluramines'],\n",
+       " 'foot infection': ['G-CSF treatment'],\n",
+       " \"early Parkinson 's disease\": ['Ropinirole monotherapy'],\n",
+       " \"abdominal tuberculosis Crohn 's disease\": ['steroids'],\n",
+       " 'treating stress urinary incontinence': ['surgical procedures'],\n",
+       " 'female stress urinary incontinence': ['surgical treatment'],\n",
+       " 'stress urinary incontinence': ['therapy'],\n",
+       " 'preeclampsia ( proteinuric hypertension )': ['intrauterine insemination with donor sperm versus intrauterine insemination'],\n",
+       " 'intra-abdominal injury': ['senior surgery'],\n",
+       " 'hyperammonemia cancer': ['organ transplantation and chemotherapy'],\n",
+       " 'major pulmonary embolism': ['Thrombolytic treatment',\n",
+       "  'thrombolytic treatment'],\n",
+       " 'malignant pleural mesothelioma': ['thoracotomy , radiotherapy , and chemotherapy'],\n",
+       " 'pulmonary symptoms': ['chemotherapy'],\n",
+       " 'non-obstructive azoospermia': ['testicular fine needle aspiration ( TEFNA ) open biopsy and testicular sperm extraction ( TESE )'],\n",
+       " 'cystic periventricular leukomalacia': ['magnesium sulfate'],\n",
+       " 'colorectal cancer': ['Elective surgery',\n",
+       "  'docosahexanoic acid ( DHA ) -concentrated fish oil capsules'],\n",
+       " 'gastrointestinal tumours': ['Elective surgery'],\n",
+       " 'c ) zary syndrome': ['Extracorporeal photopheresis'],\n",
+       " \"Parkinson 's disease\": ['Microelectrode-guided posteroventral pallidotomy'],\n",
+       " 'soft tissue sarcomas': ['Radiotherapy'],\n",
+       " \"Eisenmenger 's syndrome\": ['laparoscopic cholecystectomy'],\n",
+       " 'advanced esophageal cancer': ['adjuvant chemoradiotherapy'],\n",
+       " 'breast cancer': ['Hormone replacement therapy',\n",
+       "  'undergone subcutaneous mastectomy'],\n",
+       " 'leukemia': ['Trisomy'],\n",
+       " 'inoperable advanced malignancies such as colorectal cancer': ['combination with leucovorin or cisplatin'],\n",
+       " 'influenza influenza': ['control'],\n",
+       " 'abdominal pain': ['thoracic paravertebral block ( tpvb )'],\n",
+       " 'inflammatory skin diseases': ['topical corticosteroids'],\n",
+       " 'unresectable stage iii nsclc': ['sequential chemotherapy'],\n",
+       " 'nsclc nsclc ( stage iiib ) sclc , limited disease': ['got surgical treatment radiotherapy'],\n",
+       " 'nsclc': ['platinum-based chemotherapy', 'chemotherapy'],\n",
+       " 'locally advanced non-small-cell lung cancer ( la-nsclc )': ['chemotherapy and radiotherapy )'],\n",
+       " 'radiation-induced myelopathy': ['heparin and enoxaparin'],\n",
+       " 'limited stage small cell lung cancer': ['vip combination chemotherapy and early concurrent thoracic irradiation'],\n",
+       " 'malignant pleural effusions from nsclc': ['systemic chemotherapy'],\n",
+       " 'small-cell lung cancer': ['chemotherapy', 'combination chemotherapy'],\n",
+       " 'intraluminal early-stage cancer': ['photodynamic therapy , nd-yag laser and electrocautery'],\n",
+       " 'pathologic stage i non-small cell lung cancer': ['postoperative oral administration of uft , a 5-fluorouracil derivative chemotherapeutic agent'],\n",
+       " 'supraclavicular node metastases in nsclc': ['chemoradiotherapy'],\n",
+       " 'non-small-cell-lung-cancer ( nsclc )': ['cisplatin and radiotherapy'],\n",
+       " 'lung carcinoma': ['videothoracoscopic lobectomy or partial resection open thoracotomy',\n",
+       "  'curative therapy'],\n",
+       " 'single non-sclc melanoma ovarian carcinoma brain metastasis': ['surgical resection'],\n",
+       " 'advanced nsclc': ['combination chemotherapy of cisplatin , ifosfamide and irinotecan with rhg-csf support'],\n",
+       " 'metastatic colorectal cancer': ['intravenous oxaliplatin'],\n",
+       " \"non-hodgkin 's lymphoma , breast cancer , mesothelioma and non-small cell lung cancer\": ['oxaliplatin'],\n",
+       " 'other cancers platinum-pretreated ovarian cancer': ['oxaliplatin'],\n",
+       " 'primary tumor ( li ) bronchogenic carcinoma': ['resection'],\n",
+       " 'non-small cell lung cancer advanced hormone refractory prostate cancer': ['paclitaxel and carboplatin'],\n",
+       " 'primary lung cancer adenocarcinoma ( ad ) squamous cell carcinoma': ['resection'],\n",
+       " 'stage iii nsclc': ['chemotherapy administered before surgery or definitive irradiation'],\n",
+       " 'small cell lung cancer': ['prophylactic cranial irradiation prolongs'],\n",
+       " 'symptomatic metastases': ['radiotherapy'],\n",
+       " 'sclc': ['tumor vaccines'],\n",
+       " 'primary cancer': ['adjuvant radiation therapy'],\n",
+       " 'advanced non -- small-cell lung cancer': ['paclitaxel plus carboplatin ( pc ) vinorelbine plus cisplatin ( vc )'],\n",
+       " 'sclc extensive disease': ['platinum dose ( cisplatin plus carboplatin ) in combination chemotherapy combination therapy with carboplatin alone'],\n",
+       " 'untreated small cell lung cancer ( sclc ) untreated sclc': ['chemotherapy'],\n",
+       " 'neutropenia during cancer': ['chemotherapy'],\n",
+       " 'head and neck cancer xerostomia': ['irradiation therapy intravenous amifostine'],\n",
+       " 'psoriasis': ['active vitamin D3 analogue , 1 alpha , 24-dihydroxycholecalciferol'],\n",
+       " 'disseminated malignant melanoma': ['leukocyte A recombinant interferon ( rIFN-alpha A'],\n",
+       " 'advanced stage ( TNM IIB-IVB ) mycosis': ['a combination chemotherapy program consisting of bleomycin and methotrexate weekly , doxorubicin every'],\n",
+       " 'ventricular tachycardia': ['surgical therapy'],\n",
+       " 'non-functioning endocrine pancreatic tumor with progressive liver and lymph node metastases': ['i.m . lanreotide therapy'],\n",
+       " 'syringomyelia spinal adhesive arachnoiditis': ['Surgical management'],\n",
+       " 'bronchiectasis': ['antibiotics and surgery', 'Current surgical therapy'],\n",
+       " 'thoracic trauma': ['surgical treatment of lung lacerations'],\n",
+       " 'biliary dyskinesia': ['Cholecystectomy'],\n",
+       " 'symptoms the common cold': ['pseudoephedrine plus acetaminophen'],\n",
+       " 'acute nasopharyngitis': ['antibiotic treatment'],\n",
+       " 'symptoms of a common cold': ['Macrolide antibiotics'],\n",
+       " 'symptoms of rhinovirus colds infection rhinovirus': ['clarithromycin'],\n",
+       " 'infection': ['a combination of omeprazole , amoxicillin , and clarithromycin'],\n",
+       " 'Contemporary asthma persistent asthma': ['management guidelines list inhaled corticosteroids'],\n",
+       " 'asthma': ['Fluticasone propionate several inhaled corticosteroids'],\n",
+       " 'chronic hepatitis C': ['Combination therapy with interferon-alpha ( IFN alpha ) plus Ribavirin'],\n",
+       " 'hepatitis C viremia': ['combination therapy'],\n",
+       " 'duodenogastric reflux': ['cholecystectomy'],\n",
+       " 'severe hypoxemia': ['glucocorticoid pulse therapy'],\n",
+       " 'primary sclerosing cholangitis ( PSC )': ['oral budesonide'],\n",
+       " 'acute myocardial infarction': ['Thrombolytic therapy',\n",
+       "  'thrombolytic treatment'],\n",
+       " 'preexisting cancers primary cancer': ['Immunotherapy'],\n",
+       " 'peritoneal tumors': ['Subcutaneous injection of irradiated LLC-IL2'],\n",
+       " 'acute occlusion of the middle cerebral artery large embolus or high-grade stenosis': ['thrombolytic therapy'],\n",
+       " 'benign prostatic hyperplasia': ['conservative pharmacological treatment'],\n",
+       " 'inflammatory and autoimmune diseases': ['High-dose intravenous immunoglobulin ( hdIVIg )'],\n",
+       " 'cancer': ['oral drugs chemotherapy', 'Matrix metalloproteinase inhibitors'],\n",
+       " 'malignant melanoma': ['interferon alfa-2a'],\n",
+       " 'advanced renal cell carcinoma': ['various interferon alpha preparations interferon alfa-N1 , interferon alfa-2a , and interferon alfa-2b'],\n",
+       " 'hairy cell leukemia infection': ['antileukemic therapy'],\n",
+       " \"tumor regressions low-grade non-Hodgkin 's lymphoma\": ['Recombinant and natural forms of interferon alpha'],\n",
+       " 'esophageal achalasia': ['botulinum toxin injection , pneumatic dilation , and laparoscopic myotomy'],\n",
+       " 'prostate cancer': ['radical prostatectomy and iodine 125 interstitial radiotherapy'],\n",
+       " 'tumors': ['Immunotherapy'],\n",
+       " 'mitomycin-resistant bladder cancer': ['photodynamic therapy in combination with mitomycin C'],\n",
+       " 'B16 melanoma': ['adenosine triphosphate buthionine sulfoximine'],\n",
+       " 'primary uveal melanoma': ['transpupillary thermotherapy'],\n",
+       " 'advanced rectal cancer': ['Nerve-sparing surgery'],\n",
+       " 'spontaneous pneumothorax': ['Thoracoscopic surgery'],\n",
+       " 'acute cerebral ischemia': ['Antiplatelet therapy'],\n",
+       " 'renal cell carcinoma': ['Interferon treatment'],\n",
+       " 'partial seizures': ['lamotrigine monotherapy'],\n",
+       " 'myocardial angiogenesis': ['Gene therapy'],\n",
+       " 'autoimmune hemolytic anemia': ['heparin'],\n",
+       " 'epithelial ovarian cancer': ['chemotherapy', 'High-dose chemotherapy'],\n",
+       " 'atrial fibrillation': ['Antiplatelet therapy'],\n",
+       " 'moderately symptomatic benign prostatic hyperplasia': ['surgical resection'],\n",
+       " 'multiple sclerosis': ['Interferon beta treatment',\n",
+       "  'Intravenous immunoglobulin treatment'],\n",
+       " 'acoustic neuroma': ['Stereotactic radiosurgery'],\n",
+       " 'cerebral palsy': ['Hyperbaric oxygen therapy'],\n",
+       " 'postvitrectomy diabetic vitreous hemorrhage': ['Peripheral retinal cryotherapy'],\n",
+       " 'novel hepatitis B': ['vaccine'],\n",
+       " 'temporomandibular joint arthropathy': ['arthroscopic treatment'],\n",
+       " 'severe secondary peritonitis': ['Surgical management'],\n",
+       " 'hepatic metastases from colorectal cancer': ['Hepatic arterial infusion of chemotherapy after resection'],\n",
+       " 'Poliomyelitis': ['oral poliovirus vaccines']}"
+      ]
+     },
+     "execution_count": 133,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "diseases_and_treatments"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 134,
+   "id": "c1444790",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Disease:  hereditary retinoblastoma\n",
+      "Treatment: ['radiotherapy']\n"
+     ]
+    }
+   ],
+   "source": [
+    "diseases_identified = list(diseases_and_treatments.keys())\n",
+    "index = 1\n",
+    "\n",
+    "print(\"Disease: \",diseases_identified[index])\n",
+    "print(\"Treatment:\", diseases_and_treatments.get(diseases_identified[index]))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "5b19ebe6",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.9.12"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
+
